@@ -1,0 +1,12 @@
+# Render deployment config for the ERM Adverse Media & KYC/AML Screening Portal.
+# Render auto-injects $PORT; gunicorn binds it on 0.0.0.0 (avoids app.py's
+# 127.0.0.1 dev binding). --timeout 120 keeps long live-crawl requests
+# (~10-40s) from being killed by gunicorn's 30s default.
+services:
+  - type: web
+    name: erm-vra
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    healthCheckPath: /api/health
