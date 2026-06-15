@@ -84,8 +84,9 @@
         {% if to_verify %}
         <div style="background: #fffbeb; border-bottom: 1px solid #fde68a; color: #92400e; font-size: 12px; padding: 10px 16px;">
             <i class="fas fa-triangle-exclamation"></i>
-            {{ to_verify }} item(s) marked <b>VERIFY</b> matched on the entity name only — confirm they refer to the
-            same legal entity (PAN / proprietor / address) before acting. Common names can collide with unrelated parties.
+            {{ to_verify }} item(s) marked <b>VERIFY</b> matched on the entity name only, or via the article body
+            (name not in the headline) — open each source and confirm it refers to the same legal entity
+            (PAN / proprietor / address) before acting. Common names can collide with unrelated parties.
         </div>
         {% endif %}
         <div class="table-responsive">

@@ -257,27 +257,37 @@ def _evaluate_article(name: str, title: str, desc: str) -> tuple[str | None, str
     if not _is_adverse(combined):
         return None, None, "not_adverse"
 
-    # Gate 2 — vendor must be mentioned in the article itself, not merely
-    # associated by the search engine. Uncertain (WEAK) matches are kept and
-    # flagged, NOT dropped — a missed real hit is worse than one to verify.
     conf = _match_confidence(name, combined)
-    if conf is None:
-        return None, None, "no_mention"
+    in_title = _match_confidence(name, title) is not None
 
-    # Gate 3 — exculpatory context in the title → vendor is the
-    # solver/announcer, not the accused — skip entirely
-    if _EXCULPATORY.search(title):
+    # Gate 2 — exculpatory (vendor-as-solver), but ONLY when the vendor is named
+    # in the TITLE (e.g. "Acme launches Fraud Detection"). If the vendor isn't
+    # in the title, the title's verbs aren't about the vendor — don't drop.
+    if in_title and _EXCULPATORY.search(title):
         return None, None, "exculpatory"
 
     sev = _classify_severity(combined)
-
     if _EXCULPATORY.search(desc):
         # Softer signal in snippet only — downgrade one level
         sev = _SEV_DOWNGRADE[sev]
 
-    # A name-only (WEAK) match must never single-handedly drive a HIGH/REJECT —
-    # cap it at MEDIUM so it surfaces for review without auto-rejecting on a
-    # possible namesake.
+    # Gate 3 — entity relevance.
+    if conf is None:
+        # The name is absent from the headline/snippet. Google News RSS exposes
+        # ONLY the headline, so an entity is routinely named only in the article
+        # BODY — exactly how the real "Bala Corporation" GST story was being
+        # dropped. Discarding it is a false negative (the dangerous outcome for
+        # screening). Since every query is the entity name in quotes, the search
+        # engine matched this article to the entity, so SERIOUS adverse coverage
+        # is surfaced as a WEAK "verify in source" hit rather than dropped. Mild
+        # (LOW) coverage with no name in the headline is treated as noise.
+        if sev in ("HIGH", "MEDIUM"):
+            return "MEDIUM", WEAK, ""   # capped at MEDIUM, flagged to verify
+        return None, None, "no_mention"
+
+    # Known name match — a name-only (WEAK) hit must never single-handedly drive
+    # a HIGH/REJECT; cap at MEDIUM so it surfaces for review without
+    # auto-rejecting on a possible namesake.
     if conf == WEAK and sev == "HIGH":
         sev = "MEDIUM"
 
@@ -407,9 +417,13 @@ def search_adverse_media(name: str) -> list[dict]:
             seen_dedup_keys.append(dedup_key)
 
         # Evidence = the snippet text that mentions the entity, so a reviewer
-        # can see WHY this matched (the title alone is often truncated and may
-        # not contain the name).
+        # can see WHY this matched. When the name isn't in the headline/snippet
+        # at all, this matched via the article body — say so explicitly.
         evidence = _clean_snippet(item.get("desc", ""))
+        if _match_confidence(name, f'{item["title"]} {item["desc"]}') is None:
+            evidence = ("Entity not named in the headline — matched via search; "
+                        "the name appears in the article body. Open the source "
+                        "to confirm this refers to the entity being screened.")
         findings.append({
             "entity":           name,
             "severity":         sev,
