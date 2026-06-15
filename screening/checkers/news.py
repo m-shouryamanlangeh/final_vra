@@ -138,28 +138,41 @@ def _core_name_tokens(name: str) -> tuple[str, list[str]]:
 
 def _mentions_vendor(name: str, text: str) -> bool:
     """
-    True only if the article text actually mentions the vendor —
-    either the full core name as a phrase, or a majority of its
-    distinctive tokens.
+    True only if the article text actually mentions the vendor.
+
+    Multi-token names match on the full core phrase or a majority of their
+    distinctive tokens. A name that reduces to a SINGLE distinctive token is
+    far more error-prone — a common short name like "Bala" (from "Bala
+    Corporation") would otherwise match any unrelated story containing that
+    word. For those, when the name carries a company suffix we require the
+    token to appear AS a company ("Bala Corp", "Bala Industries"); a bare
+    single-word name (e.g. "Google") falls back to a strict word-boundary match.
     """
     core, tokens = _core_name_tokens(name)
-    if not core:
+    if not core or not tokens:
         return False
     low = text.lower()
 
-    # Full core phrase present → definite mention
-    if core in low:
-        return True
-
-    if not tokens:
-        return False
-
-    matched = sum(1 for t in tokens if re.search(rf"\b{re.escape(t)}\b", low))
     if len(tokens) == 1:
-        return matched == 1
-    # Multi-token names: require at least half the distinctive tokens
-    # (e.g. "Airtel" alone still counts for "Bharti Airtel" — the
-    # exculpatory gate handles vendor-as-solver headlines separately)
+        tok = re.escape(tokens[0])
+        # Name given with a legal suffix (e.g. "Bala Corporation") — only count
+        # it when referred to AS a company: the token followed by one of the
+        # same legal-entity suffixes this module already strips (reused, not a
+        # second hardcoded list). Stops a stray "Bala" in an unrelated story
+        # from being flagged for "Bala Corporation".
+        if _NAME_SUFFIXES.search(name):
+            return bool(re.search(rf"\b{tok}\s+{_NAME_SUFFIXES.pattern}", low, re.I))
+        # Bare single-word name — strict word-boundary match (no substrings,
+        # so "bala" no longer matches inside "balaji" / "balance").
+        return bool(re.search(rf"\b{tok}\b", low))
+
+    # Multi-token names — full core phrase present → definite mention.
+    if re.search(rf"\b{re.escape(core)}\b", low):
+        return True
+    # Otherwise require at least half the distinctive tokens (e.g. "Airtel"
+    # alone still counts for "Bharti Airtel"; the exculpatory gate handles
+    # vendor-as-solver headlines separately).
+    matched = sum(1 for t in tokens if re.search(rf"\b{re.escape(t)}\b", low))
     return matched / len(tokens) >= 0.5
 
 
