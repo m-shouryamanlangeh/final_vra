@@ -1,0 +1,16 @@
+# ERM Adverse Media & KYC/AML Screening Portal
+# Web framework (Threat Intel frontend → Flask)
+flask>=3.0.0
+
+# Screening engine (adverse-screen) dependencies
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+rapidfuzz>=3.6.0
+
+# PDF report generation
+reportlab>=4.0.0
+
+# TLS trust on macOS / corporate networks (optional but recommended)
+certifi>=2024.0.0
+truststore>=0.9.0

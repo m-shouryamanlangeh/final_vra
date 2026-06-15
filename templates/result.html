@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Screening Result{% endblock %}
+{% set es = result.executive_summary or {} %}
+{% set risk = (es.risk_level or 'LOW') | upper %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <a href="/" class="btn-light-outline"><i class="fas fa-arrow-left"></i> New Screening</a>
+    {% if pdf_url %}
+    <a href="{{ pdf_url }}" target="_blank" class="btn btn-info"><i class="fas fa-file-pdf me-2"></i>Download PDF Report</a>
+    {% endif %}
+</div>
+
+{% if not result %}
+<div class="section-card"><div class="section-card-body"><div class="empty-state">Result not found. It may have been removed from the output folder.</div></div></div>
+{% else %}
+
+<!-- Executive summary hero -->
+<div class="section-card">
+    <div class="section-card-body">
+        <div class="risk-hero">
+            <div class="risk-dial {{ risk }}">
+                <span class="rd-score">{{ es.risk_score or 0 }}</span>
+                <span class="rd-of">/ 100</span>
+            </div>
+            <div class="flex-grow-1" style="min-width: 240px;">
+                <h2 style="font-size: 20px; font-weight: 700; margin: 0; color: var(--paytm-dark);">{{ vendor_name }}</h2>
+                <div style="font-size: 12.5px; color: var(--slate-500); margin-top: 2px;">
+                    {% if vendor_pan %}PAN: {{ vendor_pan }} · {% endif %}Screened on {{ date_of_search }}
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                    <span class="badge badge-{{ risk | lower }}" style="font-size: 13px; padding: 6px 14px;">Risk: {{ risk }}</span>
+                    <span class="badge badge-{{ (es.recommendation or '') | lower }}" style="font-size: 13px; padding: 6px 14px;">{{ es.recommendation }}</span>
+                    <span class="badge badge-unverified" style="font-size: 13px; padding: 6px 14px;">{{ es.adverse_media_hits or 0 }} media hits</span>
+                </div>
+            </div>
+        </div>
+        {% if es.overall_finding %}
+        <div class="ai-summary mt-3">
+            <div class="ai-summary-head">
+                <i class="fas fa-file-lines"></i>
+                <span>Executive Summary</span>
+            </div>
+            <p class="mb-0">{{ es.overall_finding }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recommendations -->
+{% if result.recommendations %}
+<div class="section-card">
+    <div class="section-card-head">
+        <div class="icon-chip navy"><i class="fas fa-clipboard-check"></i></div>
+        <div class="titles"><h3>Recommendations</h3><div class="subtitle">Suggested compliance actions</div></div>
+    </div>
+    <div class="section-card-body">
+        <ul class="mb-0" style="padding-left: 1.1rem;">
+            {% for rec in result.recommendations %}
+            <li style="font-size: 13.5px; color: var(--slate-600); margin-bottom: 8px; line-height: 1.5;">{{ rec }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+<!-- Adverse media -->
+<div class="section-card">
+    <div class="section-card-head">
+        <div class="icon-chip" style="background: #fee2e2; color: #b91c1c;"><i class="fas fa-newspaper"></i></div>
+        <div class="titles"><h3>Adverse Media Findings</h3><div class="subtitle">{{ result.adverse_media_findings | length }} article(s) matched</div></div>
+    </div>
+    <div class="section-card-body {% if result.adverse_media_findings %}p-0{% endif %}">
+        {% if result.adverse_media_findings %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th class="ps-4">Entity</th><th>Severity</th><th>Summary</th><th class="pe-4">Source</th></tr></thead>
+                <tbody>
+                {% for m in result.adverse_media_findings %}
+                    {% set sev = (m.severity or 'LOW') | upper %}
+                    <tr>
+                        <td class="ps-4" style="color: var(--slate-500);">{{ m.entity }}</td>
+                        <td><span class="badge badge-{{ sev | lower }}">{{ sev }}</span></td>
+                        <td style="font-size: 12.5px;">{{ m.summary }}</td>
+                        <td class="pe-4" style="font-size: 12px;">
+                            {% if m.source %}<a href="{{ m.source }}" target="_blank">Open <i class="fas fa-arrow-up-right-from-square"></i></a>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No adverse media articles matched in open-source news search.</div>
+        {% endif %}
+    </div>
+</div>
+
+<p class="text-center" style="font-size: 11px; color: var(--slate-400); margin-top: 8px;">
+    OSINT-based assessment only. Does not replace legal or credit bureau data. {{ team }} · CONFIDENTIAL — internal use only.
+</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 40" width="140" height="40" role="img" aria-label="ERM">
+  <defs>
+    <linearGradient id="ermg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00BAF2"/>
+      <stop offset="1" stop-color="#002970"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield -->
+  <path d="M20 3 L34 8 V19 C34 28 28 33.5 20 37 C12 33.5 6 28 6 19 V8 Z"
+        fill="url(#ermg)"/>
+  <!-- Check -->
+  <path d="M13.5 19.5 L18 24 L27 14.5" fill="none" stroke="#ffffff"
+        stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Wordmark -->
+  <text x="44" y="21" font-family="Geist, Inter, Segoe UI, sans-serif"
+        font-size="18" font-weight="700" fill="#002970" letter-spacing="0.5">ERM</text>
+  <text x="44" y="33" font-family="Geist, Inter, Segoe UI, sans-serif"
+        font-size="7.5" font-weight="600" fill="#64748b" letter-spacing="1.2">RISK MANAGEMENT</text>
+</svg>

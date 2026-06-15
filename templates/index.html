@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}New Screening{% endblock %}
+
+{% block content %}
+<!-- Quick stats -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card">
+            <div class="metric-icon cyan"><i class="fas fa-magnifying-glass"></i></div>
+            <div class="metric-label">Total Screened</div>
+            <div class="metric-number">{{ total_screened }}</div>
+            <div class="metric-sub">Vendors checked to date</div>
+        </div>
+    </div>
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card">
+            <div class="metric-icon rose"><i class="fas fa-triangle-exclamation"></i></div>
+            <div class="metric-label">High Risk</div>
+            <div class="metric-number">{{ high_risk }}</div>
+            <div class="metric-sub">Flagged for rejection / escalation</div>
+        </div>
+    </div>
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card">
+            <div class="metric-icon emerald"><i class="fas fa-wand-magic-sparkles"></i></div>
+            <div class="metric-label">AI Summaries</div>
+            <div class="metric-number">Local LLM</div>
+            <div class="metric-sub">On-device BART · no API key</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Screening form -->
+    <div class="col-lg-8">
+        <div class="section-card">
+            <div class="section-card-head">
+                <div class="icon-chip navy"><i class="fas fa-user-shield"></i></div>
+                <div class="titles">
+                    <h3>Run Adverse Media Screen</h3>
+                    <div class="subtitle">Crawls open-source news for adverse coverage, then a local LLM writes the executive summary.</div>
+                </div>
+            </div>
+            <div class="section-card-body">
+                <form id="screen-form">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Name to Screen — Company or Individual <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="vendor_name" id="vendor_name"
+                                   value="{{ prefill_name }}" placeholder="e.g. Acme Global Services Pvt Ltd  ·  or a person's full name" required autofocus>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Vendor PAN</label>
+                            <input type="text" class="form-control" name="vendor_pan" id="vendor_pan"
+                                   value="{{ prefill_pan }}" placeholder="ABCDE1234F">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Signatory 1 PAN</label>
+                            <input type="text" class="form-control" name="sig1_pan" placeholder="Optional">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Signatory 2 PAN</label>
+                            <input type="text" class="form-control" name="sig2_pan" placeholder="Optional">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Signatory 3 PAN</label>
+                            <input type="text" class="form-control" name="sig3_pan" placeholder="Optional">
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label">Directors</label>
+                            <input type="text" class="form-control" name="directors" placeholder="Comma-separated names (optional)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Promoters / Founders / CEO</label>
+                            <input type="text" class="form-control" name="promoters" placeholder="Optional">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ultimate Beneficial Owner</label>
+                            <input type="text" class="form-control" name="ubo" placeholder="Optional">
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg" id="run-btn">
+                            <i class="fas fa-play me-2"></i>Run Screening
+                        </button>
+                        <span class="form-text mb-0">Crawls news media, then summarizes with a local LLM (first run loads the model).</span>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent screenings -->
+    <div class="col-lg-4">
+        <div class="section-card">
+            <div class="section-card-head">
+                <div class="icon-chip cyan"><i class="fas fa-clock-rotate-left"></i></div>
+                <div class="titles">
+                    <h3>Recent Screenings</h3>
+                    <div class="subtitle">Last 5 vendors checked</div>
+                </div>
+            </div>
+            <div class="section-card-body">
+                {% if recent %}
+                    {% for r in recent %}
+                    <a class="d-flex align-items-center justify-content-between text-decoration-none py-2 px-1 border-bottom"
+                       href="/result?pdf={{ r.pdf_path }}&vendor={{ r.vendor_name | urlencode }}&pan={{ r.vendor_pan | urlencode }}">
+                        <div class="text-truncate me-2">
+                            <div class="fw-semibold text-truncate" style="color: var(--paytm-dark); font-size: 13px;">{{ r.vendor_name }}</div>
+                            <div style="font-size: 11px; color: var(--slate-400);">{{ r.date_of_search }}</div>
+                        </div>
+                        <span class="badge badge-{{ r.risk_level | lower }}">{{ r.risk_level }}</span>
+                    </a>
+                    {% endfor %}
+                    <a href="/history" class="btn-light-outline btn-sm mt-3 w-100 justify-content-center"><i class="fas fa-list"></i> View all history</a>
+                {% else %}
+                    <div class="empty-state">No screenings yet. Run your first one to get started.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scanning overlay -->
+<div class="scan-overlay" id="scan-overlay">
+    <div class="scan-card">
+        <div class="spinner-border" role="status"></div>
+        <h5 id="scan-title">Screening in progress…</h5>
+        <p id="scan-sub">Crawling open-source news for adverse media coverage.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const form = document.getElementById('screen-form');
+    const overlay = document.getElementById('scan-overlay');
+    const runBtn = document.getElementById('run-btn');
+    const scanSub = document.getElementById('scan-sub');
+
+    const STEPS = [
+        "Crawling Google News &amp; web for adverse coverage…",
+        "Classifying article severity (high / medium / low)…",
+        "Scoring risk from the media signal…",
+        "Local LLM writing the executive summary…",
+        "Building the PDF report…",
+    ];
+    let stepTimer = null;
+
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const name = document.getElementById('vendor_name').value.trim();
+        if (!name) return;
+
+        const payload = {};
+        new FormData(form).forEach((v, k) => payload[k] = v);
+
+        overlay.classList.add('show');
+        runBtn.disabled = true;
+        let i = 0;
+        scanSub.innerHTML = STEPS[0];
+        stepTimer = setInterval(() => { i = (i + 1) % STEPS.length; scanSub.innerHTML = STEPS[i]; }, 3500);
+
+        try {
+            const res = await fetch('/api/screen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (data.ok && data.result_url) {
+                window.location.href = data.result_url;
+            } else {
+                throw new Error(data.error || 'Screening failed');
+            }
+        } catch (err) {
+            clearInterval(stepTimer);
+            overlay.classList.remove('show');
+            runBtn.disabled = false;
+            alert('Screening failed: ' + err.message);
+        }
+    });
+</script>
+{% endblock %}

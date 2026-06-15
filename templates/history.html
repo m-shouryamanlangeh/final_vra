@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Screening History{% endblock %}
+
+{% block content %}
+<div class="section-card">
+    <div class="section-card-head">
+        <div class="icon-chip navy"><i class="fas fa-clock-rotate-left"></i></div>
+        <div class="titles">
+            <h3>Screening History</h3>
+            <div class="subtitle"><span id="hist-count">{{ records | length }}</span> vendor screening(s) on record</div>
+        </div>
+        <div class="right-actions">
+            {% if records %}
+            <button type="button" id="clear-all" class="btn-light-outline btn-sm"><i class="fas fa-trash-can"></i> Clear all</button>
+            {% endif %}
+            <a href="/" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i>New Screening</a>
+        </div>
+    </div>
+    <div class="section-card-body {% if records %}p-0{% endif %}" id="hist-body">
+        {% if records %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="hist-table">
+                <thead><tr>
+                    <th class="ps-4">Vendor</th><th>PAN</th><th>Date</th><th>Risk</th><th>Recommendation</th><th>Report</th><th class="pe-4 text-end">Remove</th>
+                </tr></thead>
+                <tbody>
+                {% for r in records %}
+                <tr data-pdf="{{ r.pdf_path }}">
+                    <td class="ps-4 fw-semibold">{{ r.vendor_name }}</td>
+                    <td style="color: var(--slate-500);">{{ r.vendor_pan or '—' }}</td>
+                    <td style="color: var(--slate-500);">{{ r.date_of_search }}</td>
+                    <td><span class="badge badge-{{ (r.risk_level or '') | lower }}">{{ r.risk_level }}</span></td>
+                    <td><span class="badge badge-{{ (r.recommendation or '') | lower }}">{{ r.recommendation }}</span></td>
+                    <td>
+                        <a class="btn-light-outline btn-sm" href="/result?pdf={{ r.pdf_path }}&vendor={{ r.vendor_name | urlencode }}&pan={{ r.vendor_pan | urlencode }}">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                    </td>
+                    <td class="pe-4 text-end">
+                        <button type="button" class="btn-del" title="Remove this screening"
+                                data-pdf="{{ r.pdf_path }}" data-vendor="{{ r.vendor_name }}">
+                            <i class="fas fa-xmark"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No screenings yet. <a href="/">Run your first screening</a>.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function postJSON(url, body) {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body || {}),
+        });
+        return res.json();
+    }
+
+    function refreshCount() {
+        const rows = document.querySelectorAll('#hist-table tbody tr');
+        const countEl = document.getElementById('hist-count');
+        if (countEl) countEl.textContent = rows.length;
+        if (rows.length === 0) {
+            document.getElementById('hist-body').innerHTML =
+                '<div class="empty-state">No screenings yet. <a href="/">Run your first screening</a>.</div>';
+            const clear = document.getElementById('clear-all');
+            if (clear) clear.remove();
+        }
+    }
+
+    // Per-row delete
+    document.querySelectorAll('.btn-del').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            const pdf = btn.getAttribute('data-pdf');
+            const vendor = btn.getAttribute('data-vendor') || 'this screening';
+            if (!confirm('Remove the screening for "' + vendor + '"? This deletes its report too.')) return;
+            btn.disabled = true;
+            try {
+                const data = await postJSON('/api/history/delete', { pdf_path: pdf });
+                if (data.ok) {
+                    const row = btn.closest('tr');
+                    if (row) row.remove();
+                    refreshCount();
+                } else {
+                    throw new Error(data.error || 'Delete failed');
+                }
+            } catch (err) {
+                btn.disabled = false;
+                alert('Could not remove: ' + err.message);
+            }
+        });
+    });
+
+    // Clear all
+    const clearBtn = document.getElementById('clear-all');
+    if (clearBtn) clearBtn.addEventListener('click', async function () {
+        if (!confirm('Clear the ENTIRE screening history? This deletes all saved reports.')) return;
+        clearBtn.disabled = true;
+        try {
+            const data = await postJSON('/api/history/clear', {});
+            if (data.ok) {
+                document.querySelectorAll('#hist-table tbody tr').forEach(function (r) { r.remove(); });
+                refreshCount();
+            } else {
+                throw new Error(data.error || 'Clear failed');
+            }
+        } catch (err) {
+            clearBtn.disabled = false;
+            alert('Could not clear: ' + err.message);
+        }
+    });
+</script>
+{% endblock %}
