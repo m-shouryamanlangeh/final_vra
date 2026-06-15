@@ -339,7 +339,8 @@
         }
         html.dark body { background: var(--paytm-bg); color: var(--paytm-dark); }
         html.dark .dashboard-header { background: #0f172a; border-bottom-color: var(--slate-200); }
-        html.dark .brand-logo img, html.dark .sb-logo img { filter: brightness(0) invert(1); }
+        /* Invert logos for dark mode, but keep the ERM mark its original colors. */
+        html.dark .brand-logo img:not(.erm-mark), html.dark .sb-logo img:not(.erm-mark) { filter: brightness(0) invert(1); }
         html.dark .dashboard-header h1 { color: #f1f5f9; }
         html.dark .app-sidebar { background: #0a1226; border-right-color: #1f2c4d; }
         html.dark .app-sidebar .sb-logo { border-bottom-color: #1f2c4d; }
@@ -383,7 +384,7 @@
     <!-- Sidebar -->
     <aside class="app-sidebar" aria-label="Primary navigation">
         <a class="sb-logo" href="/" title="ERM Adverse Screening">
-            <img src="/static/erm-logo.svg" alt="ERM">
+            <img class="erm-mark" src="/static/erm-logo.svg" alt="ERM">
             <span class="sb-logo-text">ERM Screen</span>
         </a>
         <nav class="sb-links">
@@ -408,7 +409,7 @@
                 <a class="brand-logo" href="/">
                     <img class="paytm-mark" src="/static/paytm-logo.svg" alt="Paytm">
                     <span class="brand-divider" aria-hidden="true"></span>
-                    <img src="/static/erm-logo.svg" alt="ERM">
+                    <img class="erm-mark" src="/static/erm-logo.svg" alt="ERM">
                     <span class="brand-divider" aria-hidden="true"></span>
                     <div>
                         <h1>Adverse Media &amp; KYC/AML Screening</h1>
