@@ -116,7 +116,12 @@ def build_pdf(data: dict, out_path: Path) -> None:
         [Paragraph("<b>Risk Level:</b>", s["cell"]),      Paragraph(risk, s["cell"])],
         [Paragraph("<b>Recommendation:</b>", s["cell"]),  Paragraph(rec, s["cell"])],
         [Paragraph("<b>Risk Score:</b>", s["cell"]),      Paragraph(str(es.get("risk_score", 0)) + " / 100", s["cell"])],
-        [Paragraph("<b>Adverse Media:</b>", s["cell"]),   Paragraph(str(es.get("adverse_media_hits", 0)), s["cell"])],
+        [Paragraph("<b>Adverse Media:</b>", s["cell"]),   Paragraph(str(es.get("adverse_media_hits", 0)) + " article(s)", s["cell"])],
+        [Paragraph("<b>Watchlist Hits:</b>", s["cell"]),  Paragraph(str(es.get("list_hits", 0)), s["cell"])],
+        [Paragraph("<b>Sources Screened:</b>", s["cell"]), Paragraph(
+            str(es.get("sources_screened", 0)) + " registries + open-source news"
+            + (f" ({es.get('unverified_sources')} need manual check)" if es.get("unverified_sources") else ""),
+            s["cell"])],
         [Paragraph("<b>Overall Finding:</b>", s["cell"]), Paragraph(_xml(str(es.get("overall_finding", ""))), s["cell"])],
     ]
     t = Table(exec_rows, colWidths=[45 * mm, None])
@@ -161,6 +166,33 @@ def build_pdf(data: dict, out_path: Path) -> None:
         story.append(Paragraph(
             "No adverse media articles matched in open-source news search as of "
             f"{_xml(date_str)}.", s["body"]))
+        story.append(Spacer(1, 5 * mm))
+
+    # Source Screening Checklist
+    checklist = data.get("checklist", [])
+    if checklist:
+        story.append(Paragraph("Source Screening Checklist", s["h2"]))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=BLUE))
+        story.append(Spacer(1, 2 * mm))
+        cl = [[Paragraph("<b>Source</b>", s["bcell"]), Paragraph("<b>Result</b>", s["bcell"]),
+               Paragraph("<b>Finding</b>", s["bcell"])]]
+        for row in checklist:
+            res = str(row.get("result", "UNVERIFIED")).upper()
+            rc = _result_color(res)
+            cl.append([
+                Paragraph(_xml(str(row.get("list_name", ""))), s["cell"]),
+                Paragraph(f'<font color="#{rc.hexval()[2:]}"><b>{res}</b></font>', s["cell"]),
+                Paragraph(_xml(str(row.get("finding", ""))), s["cell"]),
+            ])
+        ct = Table(cl, colWidths=[48 * mm, 22 * mm, None])
+        ct.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
+            ("BACKGROUND", (0, 0), (-1, 0), LGRAY),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(ct)
         story.append(Spacer(1, 5 * mm))
 
     # Recommendations

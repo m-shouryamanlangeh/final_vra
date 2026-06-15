@@ -32,7 +32,15 @@
                     <span class="badge badge-{{ risk | lower }}" style="font-size: 13px; padding: 6px 14px;">Risk: {{ risk }}</span>
                     <span class="badge badge-{{ (es.recommendation or '') | lower }}" style="font-size: 13px; padding: 6px 14px;">{{ es.recommendation }}</span>
                     <span class="badge badge-unverified" style="font-size: 13px; padding: 6px 14px;">{{ es.adverse_media_hits or 0 }} media hits</span>
+                    {% if es.list_hits %}<span class="badge badge-high" style="font-size: 13px; padding: 6px 14px;">{{ es.list_hits }} watchlist hit(s)</span>{% endif %}
                 </div>
+                {% if es.sources_screened %}
+                <div style="font-size: 11.5px; color: var(--slate-400); margin-top: 10px;">
+                    <i class="fas fa-shield-halved"></i>
+                    Screened against {{ es.sources_screened }} regulatory / sanctions sources + open-source news
+                    {% if es.unverified_sources %}· {{ es.unverified_sources }} require manual verification{% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
         {% if es.overall_finding %}
@@ -95,6 +103,43 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Source screening checklist -->
+{% if result.checklist %}
+{% set badge_for = {'HIT': 'badge-high', 'CLEAR': 'badge-low', 'UNVERIFIED': 'badge-unverified'} %}
+<div class="section-card">
+    <div class="section-card-head">
+        <div class="icon-chip navy"><i class="fas fa-list-check"></i></div>
+        <div class="titles">
+            <h3>Source Screening Checklist</h3>
+            <div class="subtitle">{{ result.checklist | length }} sanctions / regulatory / court sources screened</div>
+        </div>
+    </div>
+    <div class="section-card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead><tr><th class="ps-4">Source</th><th>Result</th><th>Finding</th><th class="pe-4">Link</th></tr></thead>
+                <tbody>
+                {% for cat in result.checklist | map(attribute='category') | unique %}
+                    <tr><td colspan="4" class="ps-4" style="background: var(--slate-50); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--slate-500);">{{ cat }}</td></tr>
+                    {% for c in result.checklist if c.category == cat %}
+                    {% set res = (c.result or 'UNVERIFIED') | upper %}
+                    <tr>
+                        <td class="ps-4" style="font-size: 12.5px; font-weight: 600; color: var(--slate-600);">{{ c.list_name }}</td>
+                        <td><span class="badge {{ badge_for.get(res, 'badge-unverified') }}">{{ res }}</span></td>
+                        <td style="font-size: 12px; color: var(--slate-500);">{{ c.finding }}</td>
+                        <td class="pe-4" style="font-size: 12px;">
+                            {% if c.source_url %}<a href="{{ c.source_url }}" target="_blank">Open <i class="fas fa-arrow-up-right-from-square"></i></a>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <p class="text-center" style="font-size: 11px; color: var(--slate-400); margin-top: 8px;">
     OSINT-based assessment only. Does not replace legal or credit bureau data. {{ team }} · CONFIDENTIAL — internal use only.

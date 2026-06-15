@@ -4,7 +4,7 @@
 {% block content %}
 <!-- Quick stats -->
 <div class="row g-3 mb-4">
-    <div class="col-lg-6 col-md-6">
+    <div class="col-lg-4 col-md-6">
         <div class="metric-card">
             <div class="metric-icon cyan"><i class="fas fa-magnifying-glass"></i></div>
             <div class="metric-label">Total Screened</div>
@@ -12,12 +12,20 @@
             <div class="metric-sub">Vendors checked to date</div>
         </div>
     </div>
-    <div class="col-lg-6 col-md-6">
+    <div class="col-lg-4 col-md-6">
         <div class="metric-card">
             <div class="metric-icon rose"><i class="fas fa-triangle-exclamation"></i></div>
             <div class="metric-label">High Risk</div>
             <div class="metric-number">{{ high_risk }}</div>
             <div class="metric-sub">Flagged for rejection / escalation</div>
+        </div>
+    </div>
+    <div class="col-lg-4 col-md-6">
+        <div class="metric-card">
+            <div class="metric-icon emerald"><i class="fas fa-shield-halved"></i></div>
+            <div class="metric-label">Sources Screened</div>
+            <div class="metric-number">{{ sources }}+</div>
+            <div class="metric-sub">Sanctions, SEBI, MCA, courts &amp; news</div>
         </div>
     </div>
 </div>
@@ -30,7 +38,7 @@
                 <div class="icon-chip navy"><i class="fas fa-user-shield"></i></div>
                 <div class="titles">
                     <h3>Run Adverse Media Screen</h3>
-                    <div class="subtitle">Crawls open-source news for adverse coverage, then writes an executive summary of the findings.</div>
+                    <div class="subtitle">Screens sanctions, regulatory, court &amp; news sources for adverse coverage, then writes an executive summary.</div>
                 </div>
             </div>
             <div class="section-card-body">
@@ -75,7 +83,7 @@
                         <button type="submit" class="btn btn-primary btn-lg" id="run-btn">
                             <i class="fas fa-play me-2"></i>Run Screening
                         </button>
-                        <span class="form-text mb-0">Crawls open-source news media and summarizes the adverse-media findings.</span>
+                        <span class="form-text mb-0">Screens sanctions, regulatory &amp; court registries plus open-source news.</span>
                     </div>
                 </form>
             </div>
@@ -132,8 +140,9 @@
 
     const STEPS = [
         "Crawling Google News &amp; web for adverse coverage…",
-        "Classifying article severity (high / medium / low)…",
-        "Scoring risk from the media signal…",
+        "Screening sanctions lists (OFAC, UN, EU) &amp; ICIJ leaks…",
+        "Checking SEBI, MCA, NCLT, IBBI &amp; court records…",
+        "Scoring risk across all sources…",
         "Writing the executive summary…",
         "Building the PDF report…",
     ];

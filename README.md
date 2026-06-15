@@ -18,13 +18,16 @@ UBO). The engine:
 - **Crawls open-source adverse media** — Google News RSS + DuckDuckGo — and
   classifies each article by severity (HIGH / MEDIUM / LOW) with entity-mention
   and exculpatory-pattern filtering.
-- **Scores risk from the media signal** → **LOW / MEDIUM / HIGH** with a
-  **PROCEED / CONDITIONAL / REJECT** recommendation.
+- **Screens 19 regulatory / sanctions / court sources** concurrently — OFAC
+  SDN, UN & EU consolidated sanctions, ICIJ Offshore Leaks, SEBI, MCA
+  Struck-Off, NCLT, IBBI, Indian Kanoon, and more. Sources that need a login
+  or aren't machine-readable are returned as **UNVERIFIED** (flagged for manual
+  review) rather than guessed at.
+- **Scores risk across both signals** → **LOW / MEDIUM / HIGH** with a
+  **PROCEED / CONDITIONAL / REJECT** recommendation. A confirmed watchlist HIT
+  forces a REJECT.
 - **Writes a deterministic, rule-based executive summary** of the findings.
 - Renders the result in the ERM dashboard and saves a downloadable PDF.
-
-> The regulatory / sanctions checklist has been removed — this build focuses
-> solely on the adverse-media check.
 
 ## Run
 
@@ -52,10 +55,13 @@ python app.py            # http://127.0.0.1:8080  (set PORT to change)
 ```
 app.py                  Flask app (routes, history store, output serving)
 screening/              Screening engine (from adverse-screen)
-  screener.py             Orchestrator: crawls media, scores risk, summarizes
+  screener.py             Orchestrator: media + checklist, scores risk, summarizes
+  checklist.py            Runs all list-checkers concurrently (sanctions + regulatory)
   pdf_report.py           ERM-branded PDF report builder (reportlab)
   checkers/news.py        Adverse-media crawler + severity classifier
-  checkers/               base, sanctions, india (retained, no longer invoked)
+  checkers/sanctions.py   OFAC SDN, UN & EU consolidated sanctions
+  checkers/india.py       SEBI, MCA, NCLT, IBBI, Indian Kanoon, ICIJ, …
+  checkers/base.py        Shared HTTP, caching & fuzzy-match helpers
 templates/              ERM frontend (Jinja2), reused from Threat Intel design
   base.html               Shell: sidebar + header + theme + component CSS
   index.html  result.html  history.html
@@ -65,7 +71,12 @@ output/                 Generated reports (JSON + PDF) + history.json
 
 ## Notes
 
-- It crawls public news sources live, so screening takes ~10–40s and needs
-  network access.
+- It queries public news sources and registries live (concurrently), so
+  screening takes ~15–45s and needs network access.
+- Many official portals (RBI, CIBIL, CBI, Cybercrime, CBDT, Maharashtra GST,
+  MCA MLM/Shell) require a login or aren't machine-readable — these are
+  reported as **UNVERIFIED / manual check required**, never as a false CLEAR or
+  HIT. The freely-accessible sources (OFAC, UN, EU, SEBI, MCA struck-off, NCLT,
+  IBBI, Indian Kanoon, ICIJ) are checked automatically.
 - OSINT-based assessment only; does not replace legal or credit-bureau data.
   **CONFIDENTIAL — internal use only.**

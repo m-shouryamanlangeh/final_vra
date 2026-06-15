@@ -57,6 +57,7 @@ logger = logging.getLogger("erm.screen")
 # Screening engine (pure Python) + PDF builder
 from screening.screener import run_screen          # noqa: E402
 from screening.pdf_report import build_pdf          # noqa: E402
+from screening.checklist import SOURCE_COUNT        # noqa: E402
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -99,6 +100,7 @@ def index():
         prefill_pan=request.args.get("pan", ""),
         total_screened=len(history),
         high_risk=high,
+        sources=SOURCE_COUNT,
         recent=list(reversed(history))[:5],
     )
 
