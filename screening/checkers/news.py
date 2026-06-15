@@ -136,44 +136,57 @@ def _core_name_tokens(name: str) -> tuple[str, list[str]]:
     return core, tokens
 
 
-def _mentions_vendor(name: str, text: str) -> bool:
-    """
-    True only if the article text actually mentions the vendor.
+# Match-confidence tiers. The screening engine must NEVER silently drop a name
+# match on a guess (a false negative is the dangerous outcome for KYC/AML), so
+# uncertain matches are surfaced as WEAK ("verify the entity") rather than
+# discarded — only a genuine absence of the name returns None.
+STRONG, WEAK = "STRONG", "WEAK"
 
-    Multi-token names match on the full core phrase or a majority of their
-    distinctive tokens. A name that reduces to a SINGLE distinctive token is
-    far more error-prone — a common short name like "Bala" (from "Bala
-    Corporation") would otherwise match any unrelated story containing that
-    word. For those, when the name carries a company suffix we require the
-    token to appear AS a company ("Bala Corp", "Bala Industries"); a bare
-    single-word name (e.g. "Google") falls back to a strict word-boundary match.
+
+def _match_confidence(name: str, text: str) -> str | None:
+    """
+    How confidently `text` refers to the vendor:
+      STRONG — the full name appears: a multi-word core phrase ("Bharti
+               Airtel"), all distinctive tokens, or a single-token name written
+               AS a company ("Bala Corporation" / "Bala Corp").
+      WEAK   — only a partial signal: a bare common token ("Bala"), or a
+               minority of a multi-token name ("Airtel" alone). Surfaced for
+               manual verification, but never used to auto-escalate to HIGH.
+      None   — the name does not appear at all → not this entity, discard.
     """
     core, tokens = _core_name_tokens(name)
     if not core or not tokens:
-        return False
+        return None
     low = text.lower()
 
     if len(tokens) == 1:
         tok = re.escape(tokens[0])
-        # Name given with a legal suffix (e.g. "Bala Corporation") — only count
-        # it when referred to AS a company: the token followed by one of the
-        # same legal-entity suffixes this module already strips (reused, not a
-        # second hardcoded list). Stops a stray "Bala" in an unrelated story
-        # from being flagged for "Bala Corporation".
-        if _NAME_SUFFIXES.search(name):
-            return bool(re.search(rf"\b{tok}\s+{_NAME_SUFFIXES.pattern}", low, re.I))
-        # Bare single-word name — strict word-boundary match (no substrings,
-        # so "bala" no longer matches inside "balaji" / "balance").
-        return bool(re.search(rf"\b{tok}\b", low))
+        # Single-token name carrying a legal suffix (e.g. "Bala Corporation"):
+        # STRONG only when written as a company — the token followed by one of
+        # the same legal-entity suffixes this module strips (reused list).
+        if _NAME_SUFFIXES.search(name) and re.search(
+                rf"\b{tok}\s+{_NAME_SUFFIXES.pattern}", low, re.I):
+            return STRONG
+        # The bare token appears (word-boundary, no substrings). For a common
+        # single word this is only a POSSIBLE match → WEAK, surface to verify.
+        if re.search(rf"\b{tok}\b", low):
+            return WEAK
+        return None
 
-    # Multi-token names — full core phrase present → definite mention.
+    # Multi-token names — full core phrase, or every distinctive token present.
     if re.search(rf"\b{re.escape(core)}\b", low):
-        return True
-    # Otherwise require at least half the distinctive tokens (e.g. "Airtel"
-    # alone still counts for "Bharti Airtel"; the exculpatory gate handles
-    # vendor-as-solver headlines separately).
+        return STRONG
     matched = sum(1 for t in tokens if re.search(rf"\b{re.escape(t)}\b", low))
-    return matched / len(tokens) >= 0.5
+    if matched == len(tokens):
+        return STRONG
+    if matched / len(tokens) >= 0.5:
+        return WEAK
+    return None
+
+
+def _mentions_vendor(name: str, text: str) -> bool:
+    """Back-compat boolean wrapper around :func:`_match_confidence`."""
+    return _match_confidence(name, text) is not None
 
 
 def _classify_severity(text: str) -> str:
@@ -224,27 +237,37 @@ def _dedup_key(title: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-def _evaluate_article(name: str, title: str, desc: str) -> tuple[str | None, str]:
+def _clean_snippet(text: str) -> str:
+    """Strip HTML/entities from a feed description so it can be shown as the
+    evidence that explains *why* an article matched."""
+    text = re.sub(r"<[^>]+>", " ", text or "")
+    text = re.sub(r"&[#0-9a-z]+;", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _evaluate_article(name: str, title: str, desc: str) -> tuple[str | None, str | None, str]:
     """
     Apply all relevance/context gates to one article.
-    Returns (severity, "") if the article counts,
-    or (None, skip_reason) if it must be discarded.
+    Returns (severity, match_confidence, "") if the article counts,
+    or (None, None, skip_reason) if it must be discarded.
     """
     combined = f"{title} {desc}"
 
     # Gate 1 — must actually be adverse
     if not _is_adverse(combined):
-        return None, "not_adverse"
+        return None, None, "not_adverse"
 
-    # Gate 2 — vendor must be mentioned in the article itself,
-    # not merely associated by the search engine
-    if not _mentions_vendor(name, combined):
-        return None, "no_mention"
+    # Gate 2 — vendor must be mentioned in the article itself, not merely
+    # associated by the search engine. Uncertain (WEAK) matches are kept and
+    # flagged, NOT dropped — a missed real hit is worse than one to verify.
+    conf = _match_confidence(name, combined)
+    if conf is None:
+        return None, None, "no_mention"
 
     # Gate 3 — exculpatory context in the title → vendor is the
     # solver/announcer, not the accused — skip entirely
     if _EXCULPATORY.search(title):
-        return None, "exculpatory"
+        return None, None, "exculpatory"
 
     sev = _classify_severity(combined)
 
@@ -252,7 +275,13 @@ def _evaluate_article(name: str, title: str, desc: str) -> tuple[str | None, str
         # Softer signal in snippet only — downgrade one level
         sev = _SEV_DOWNGRADE[sev]
 
-    return sev, ""
+    # A name-only (WEAK) match must never single-handedly drive a HIGH/REJECT —
+    # cap it at MEDIUM so it surfaces for review without auto-rejecting on a
+    # possible namesake.
+    if conf == WEAK and sev == "HIGH":
+        sev = "MEDIUM"
+
+    return sev, conf, ""
 
 
 # ---------------------------------------------------------------------------
@@ -330,11 +359,14 @@ def _fetch_ddg(query: str) -> list[dict]:
 def search_adverse_media(name: str) -> list[dict]:
     """
     Search multiple news sources for adverse coverage of `name`.
-    Returns a list of adverse_media_findings dicts.
+    Returns a list of adverse_media_findings dicts, each carrying a
+    ``match_confidence`` (STRONG/WEAK) and an ``evidence`` snippet.
 
     An article is only counted if:
       • it contains at least one adverse keyword, AND
-      • the vendor name actually appears in its title/snippet, AND
+      • the vendor name appears in its title/snippet (STRONG if the full name /
+        company form is present, WEAK if only a partial / bare-token match —
+        WEAK is surfaced for verification, never silently dropped), AND
       • the title does not show exculpatory context (vendor-as-solver).
     """
     findings: list[dict] = []
@@ -362,7 +394,7 @@ def search_adverse_media(name: str) -> list[dict]:
             skipped["duplicate"] += 1
             return
 
-        sev, reason = _evaluate_article(name, item["title"], item["desc"])
+        sev, conf, reason = _evaluate_article(name, item["title"], item["desc"])
         if sev is None:
             if reason in skipped:
                 skipped[reason] += 1
@@ -374,10 +406,16 @@ def search_adverse_media(name: str) -> list[dict]:
         if dedup_key:
             seen_dedup_keys.append(dedup_key)
 
+        # Evidence = the snippet text that mentions the entity, so a reviewer
+        # can see WHY this matched (the title alone is often truncated and may
+        # not contain the name).
+        evidence = _clean_snippet(item.get("desc", ""))
         findings.append({
             "entity":           name,
             "severity":         sev,
+            "match_confidence": conf,                    # STRONG | WEAK
             "summary":          item["title"][:200],
+            "evidence":         evidence[:300],
             "source":           link,
             "search_hyperlink": hyperlink,
             "pub_date":         pub,
@@ -397,14 +435,18 @@ def search_adverse_media(name: str) -> list[dict]:
     for item in _fetch_ddg(ddg_q):
         _consider(item, ddg_link, "")
 
-    # Sort by severity: HIGH → MEDIUM → LOW
+    # Sort by severity (HIGH → LOW), then confirmed (STRONG) before to-verify.
     _sev_ord = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
-    findings.sort(key=lambda x: _sev_ord.get(x["severity"], 3))
+    _conf_ord = {STRONG: 0, WEAK: 1}
+    findings.sort(key=lambda x: (_sev_ord.get(x["severity"], 3),
+                                 _conf_ord.get(x.get("match_confidence"), 2)))
 
+    strong = sum(1 for f in findings if f.get("match_confidence") == STRONG)
+    weak = len(findings) - strong
     logger.info(
-        "Adverse media for '%s': %d finding(s) "
+        "Adverse media for '%s': %d finding(s) [%d confirmed, %d to-verify] "
         "(skipped: %d no-mention, %d exculpatory, %d duplicate)",
-        name, len(findings),
+        name, len(findings), strong, weak,
         skipped["no_mention"], skipped["exculpatory"], skipped["duplicate"],
     )
     return findings

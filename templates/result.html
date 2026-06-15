@@ -80,16 +80,32 @@
     </div>
     <div class="section-card-body {% if result.adverse_media_findings %}p-0{% endif %}">
         {% if result.adverse_media_findings %}
+        {% set to_verify = result.adverse_media_findings | selectattr('match_confidence', 'equalto', 'WEAK') | list | length %}
+        {% if to_verify %}
+        <div style="background: #fffbeb; border-bottom: 1px solid #fde68a; color: #92400e; font-size: 12px; padding: 10px 16px;">
+            <i class="fas fa-triangle-exclamation"></i>
+            {{ to_verify }} item(s) marked <b>VERIFY</b> matched on the entity name only — confirm they refer to the
+            same legal entity (PAN / proprietor / address) before acting. Common names can collide with unrelated parties.
+        </div>
+        {% endif %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead><tr><th class="ps-4">Entity</th><th>Severity</th><th>Summary</th><th class="pe-4">Source</th></tr></thead>
+                <thead><tr><th class="ps-4">Entity</th><th>Severity</th><th>Match</th><th>Summary &amp; Evidence</th><th class="pe-4">Source</th></tr></thead>
                 <tbody>
                 {% for m in result.adverse_media_findings %}
                     {% set sev = (m.severity or 'LOW') | upper %}
+                    {% set conf = (m.match_confidence or 'STRONG') | upper %}
                     <tr>
                         <td class="ps-4" style="color: var(--slate-500);">{{ m.entity }}</td>
                         <td><span class="badge badge-{{ sev | lower }}">{{ sev }}</span></td>
-                        <td style="font-size: 12.5px;">{{ m.summary }}</td>
+                        <td>
+                            {% if conf == 'WEAK' %}<span class="badge badge-unverified" title="Name-only match — verify entity">VERIFY</span>
+                            {% else %}<span class="badge badge-low" title="Full name match">CONFIRMED</span>{% endif %}
+                        </td>
+                        <td style="font-size: 12.5px;">
+                            {{ m.summary }}
+                            {% if m.evidence %}<div style="font-size: 11.5px; color: var(--slate-400); margin-top: 4px;"><i class="fas fa-quote-left" style="font-size:9px;"></i> {{ m.evidence }}</div>{% endif %}
+                        </td>
                         <td class="pe-4" style="font-size: 12px;">
                             {% if m.source %}<a href="{{ m.source }}" target="_blank">Open <i class="fas fa-arrow-up-right-from-square"></i></a>{% endif %}
                         </td>

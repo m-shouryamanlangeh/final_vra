@@ -142,17 +142,27 @@ def build_pdf(data: dict, out_path: Path) -> None:
     story.append(Spacer(1, 2 * mm))
     if media:
         am = [[Paragraph("<b>Entity</b>", s["bcell"]), Paragraph("<b>Severity</b>", s["bcell"]),
-               Paragraph("<b>Summary</b>", s["bcell"]), Paragraph("<b>Source</b>", s["bcell"])]]
+               Paragraph("<b>Match</b>", s["bcell"]),
+               Paragraph("<b>Summary &amp; Evidence</b>", s["bcell"]), Paragraph("<b>Source</b>", s["bcell"])]]
         for row in media:
             sev = str(row.get("severity", "LOW")).upper()
             sc = _risk_color(sev)
+            conf = str(row.get("match_confidence", "STRONG")).upper()
+            is_weak = conf == "WEAK"
+            match_txt = ('<font color="#ea580c"><b>VERIFY</b></font>' if is_weak
+                         else '<font color="#16a34a"><b>CONFIRMED</b></font>')
+            summary = _xml(str(row.get("summary", "")))
+            evidence = _xml(str(row.get("evidence", "")))
+            if evidence:
+                summary += f'<br/><font size="6" color="#94a3b8">“{evidence}”</font>'
             am.append([
                 Paragraph(_xml(str(row.get("entity", ""))), s["cell"]),
                 Paragraph(f'<font color="#{sc.hexval()[2:]}"><b>{sev}</b></font>', s["cell"]),
-                Paragraph(_xml(str(row.get("summary", ""))), s["cell"]),
+                Paragraph(match_txt, s["cell"]),
+                Paragraph(summary, s["cell"]),
                 Paragraph(_xml(str(row.get("source", ""))), s["small"]),
             ])
-        at = Table(am, colWidths=[38 * mm, 20 * mm, None, 35 * mm])
+        at = Table(am, colWidths=[30 * mm, 16 * mm, 18 * mm, None, 28 * mm])
         at.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
             ("BACKGROUND", (0, 0), (-1, 0), LGRAY),

@@ -17,7 +17,11 @@ UBO). The engine:
 
 - **Crawls open-source adverse media** — Google News RSS + DuckDuckGo — and
   classifies each article by severity (HIGH / MEDIUM / LOW) with entity-mention
-  and exculpatory-pattern filtering.
+  and exculpatory-pattern filtering. Each hit carries a **match confidence**:
+  **CONFIRMED** (the full company name appears) or **VERIFY** (name-only / partial
+  match — surfaced with its evidence snippet, never silently dropped, and never
+  allowed to auto-escalate to HIGH on its own). Common-name collisions are
+  flagged for human entity-disambiguation rather than guessed at.
 - **Screens 19 regulatory / sanctions / court sources** concurrently — OFAC
   SDN, UN & EU consolidated sanctions, ICIJ Offshore Leaks, SEBI, MCA
   Struck-Off, NCLT, IBBI, Indian Kanoon, and more. Sources that need a login
@@ -78,5 +82,11 @@ output/                 Generated reports (JSON + PDF) + history.json
   reported as **UNVERIFIED / manual check required**, never as a false CLEAR or
   HIT. The freely-accessible sources (OFAC, UN, EU, SEBI, MCA struck-off, NCLT,
   IBBI, Indian Kanoon, ICIJ) are checked automatically.
+- **Entity disambiguation is the analyst's call.** Open-source news rarely
+  lists a PAN/CIN, so a name match cannot by itself prove it's the same legal
+  entity. The tool makes this explicit: anything not a full-name match is shown
+  as **VERIFY** with its evidence snippet, and a name-only match never triggers
+  an automatic HIGH/REJECT. Always confirm a hit against the vendor's
+  PAN / proprietor / address before acting.
 - OSINT-based assessment only; does not replace legal or credit-bureau data.
   **CONFIDENTIAL — internal use only.**
