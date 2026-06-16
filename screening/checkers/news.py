@@ -147,9 +147,11 @@ def _match_confidence(name: str, text: str) -> str | None:
     """
     How confidently `text` refers to the vendor:
       STRONG — the full name appears: a multi-word core phrase ("Bharti
-               Airtel"), all distinctive tokens, or a single-token name written
-               AS a company ("Bala Corporation" / "Bala Corp").
-      WEAK   — only a partial signal: a bare common token ("Bala"), or a
+               Airtel"), all distinctive tokens, a bare single-word name typed
+               without a suffix ("Paytm", "Google"), or a suffixed single-token
+               name written AS a company ("Bala Corporation" / "Bala Corp").
+      WEAK   — only a partial signal: a suffixed name matched by its bare token
+               only (a possible namesake — "Bala" for "Bala Corporation"), or a
                minority of a multi-token name ("Airtel" alone). Surfaced for
                manual verification, but never used to auto-escalate to HIGH.
       None   — the name does not appear at all → not this entity, discard.
@@ -161,16 +163,21 @@ def _match_confidence(name: str, text: str) -> str | None:
 
     if len(tokens) == 1:
         tok = re.escape(tokens[0])
-        # Single-token name carrying a legal suffix (e.g. "Bala Corporation"):
-        # STRONG only when written as a company — the token followed by one of
-        # the same legal-entity suffixes this module strips (reused list).
-        if _NAME_SUFFIXES.search(name) and re.search(
-                rf"\b{tok}\s+{_NAME_SUFFIXES.pattern}", low, re.I):
-            return STRONG
-        # The bare token appears (word-boundary, no substrings). For a common
-        # single word this is only a POSSIBLE match → WEAK, surface to verify.
+        if _NAME_SUFFIXES.search(name):
+            # Name carries a legal suffix (e.g. "Bala Corporation"): a bare
+            # "Bala" could be an unrelated person, so STRONG only when written
+            # AS a company — the token followed by a legal-entity suffix.
+            if re.search(rf"\b{tok}\s+{_NAME_SUFFIXES.pattern}", low, re.I):
+                return STRONG
+            if re.search(rf"\b{tok}\b", low):
+                return WEAK            # possible namesake — surface to verify
+            return None
+        # Bare single-word name (e.g. "Paytm", "Google"): the search term IS the
+        # whole name, so a word-boundary match in the headline/snippet is a
+        # confident mention. (Body-only matches are downgraded in
+        # _evaluate_article; a stray substring can't match — \b anchors it.)
         if re.search(rf"\b{tok}\b", low):
-            return WEAK
+            return STRONG
         return None
 
     # Multi-token names — full core phrase, or every distinctive token present.
