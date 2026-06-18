@@ -58,7 +58,10 @@ _MEDIUM_KEYWORDS = re.compile(
     r"penalty|penalised|penalized|fine(d)?|sued|lawsuit|litigation|"
     r"settlement|class action|misconduct|wrongdoing|malpractice|"
     r"violation|breach|data breach|whistleblower|allegation|alleged|"
-    r"accus(ed|ation)|tax evasion|GST fraud|loan default|NPA|non.performing|"
+    r"accus(ed|ation)|tax evasion|gst evasion|evasion|evad(e|ed|es|ing)|GST fraud|"
+    r"crackdown|cracks down|crack down|cracked down|DGGI|DRI|"
+    r"under the scanner|under scanner|under the lens|seized|seizure|show cause|"
+    r"loan default|NPA|non.performing|"
     r"search operation|NCLT|liquidat|winding.up|bankruptcy|arbitration|"
     r"dispute|irregularit|misappropriat|embezzl|regulator(y)? action|"
     r"recall|suspension|suspended|de.?listed)\b",
@@ -265,12 +268,14 @@ def _evaluate_article(name: str, title: str, desc: str) -> tuple[str | None, str
         return None, None, "not_adverse"
 
     conf = _match_confidence(name, combined)
-    in_title = _match_confidence(name, title) is not None
+    title_conf = _match_confidence(name, title)
 
-    # Gate 2 — exculpatory (vendor-as-solver), but ONLY when the vendor is named
-    # in the TITLE (e.g. "Acme launches Fraud Detection"). If the vendor isn't
-    # in the title, the title's verbs aren't about the vendor — don't drop.
-    if in_title and _EXCULPATORY.search(title):
+    # Gate 2 — exculpatory (vendor-as-solver), but ONLY when the vendor is the
+    # STRONG subject of the title (e.g. "Acme launches Fraud Detection"). A weak
+    # / partial title match must NOT suppress: in "DGGI cracks down on fintech
+    # firms" the firms are the TARGET of the crackdown, not the solver — that is
+    # adverse, and must not be mistaken for vendor-as-solver.
+    if title_conf == STRONG and _EXCULPATORY.search(title):
         return None, None, "exculpatory"
 
     sev = _classify_severity(combined)

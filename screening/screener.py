@@ -71,18 +71,7 @@ def _rule_based_finding(vendor_name: str, media: list[dict], risk: str,
             "across the sources screened. The entity appears clean based on "
             "available public data."
         )
-    high, med, low = _counts(media)
-    parts = [f"{len(media)} adverse media article(s) found for {vendor_name}"]
-    sev_bits = []
-    if high:
-        sev_bits.append(f"{high} high-severity")
-    if med:
-        sev_bits.append(f"{med} medium-severity")
-    if low:
-        sev_bits.append(f"{low} low-severity")
-    if sev_bits:
-        parts.append(f" ({', '.join(sev_bits)})")
-    parts.append(".")
+    parts = [f"{len(media)} adverse media article(s) found for {vendor_name}."]
     if risk == "HIGH":
         parts.append(" A repeated pattern of serious adverse coverage was detected — treat as high risk.")
     elif risk == "MEDIUM":
@@ -107,7 +96,7 @@ def _make_recommendations(risk: str, media: list[dict],
     if risk in ("HIGH", "MEDIUM"):
         recs.append("Conduct enhanced due diligence (EDD) and verify the adverse media findings against primary sources.")
     if high:
-        recs.append("Manually review each HIGH-severity article and confirm it refers to the same legal entity before acting.")
+        recs.append("Manually review the most serious adverse media articles and confirm each refers to the same legal entity before acting.")
     if media:
         recs.append("Perform entity disambiguation — rule out similarly named but unrelated parties.")
     if risk == "LOW":

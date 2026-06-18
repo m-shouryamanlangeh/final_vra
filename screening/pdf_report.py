@@ -9,6 +9,8 @@ import datetime as dt
 import logging
 from pathlib import Path
 
+from .dates import prepare_media, format_date, DISPLAY_FORMAT
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -41,11 +43,6 @@ def _risk_color(level: str):
     return {"HIGH": RED, "MEDIUM": ORANGE, "LOW": GREEN}.get(level.upper(), DGRAY)
 
 
-def _result_color(result: str):
-    return {"HIT": RED, "UNVERIFIED": ORANGE, "CLEAR": GREEN,
-            "MANUAL CHECK REQUIRED": ORANGE}.get(result.upper(), DGRAY)
-
-
 def _xml(t: str) -> str:
     return (t or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -70,7 +67,7 @@ def build_pdf(data: dict, out_path: Path) -> None:
 
     vendor_name = data.get("vendor_name", "")
     vendor_pan  = data.get("vendor_pan", "")
-    date_str    = data.get("date_of_search", dt.date.today().isoformat())
+    date_str    = format_date(data.get("date_of_search")) or dt.date.today().strftime(DISPLAY_FORMAT)
     es          = data.get("executive_summary", {})
     risk        = str(es.get("risk_level", "UNKNOWN")).upper()
     rec         = str(es.get("recommendation", "CONDITIONAL")).upper()
@@ -135,18 +132,18 @@ def build_pdf(data: dict, out_path: Path) -> None:
     story.append(t)
     story.append(Spacer(1, 5 * mm))
 
-    # Adverse Media
-    media = data.get("adverse_media_findings", [])
+    # Adverse Media — newest-first; dates in one format, undated entries last.
+    media = prepare_media(data.get("adverse_media_findings", []),
+                          data.get("date_of_search", ""))
     story.append(Paragraph("Adverse Media Findings", s["h2"]))
     story.append(HRFlowable(width="100%", thickness=0.5, color=BLUE))
     story.append(Spacer(1, 2 * mm))
     if media:
-        am = [[Paragraph("<b>Entity</b>", s["bcell"]), Paragraph("<b>Severity</b>", s["bcell"]),
+        am = [[Paragraph("<b>Entity</b>", s["bcell"]),
+               Paragraph("<b>Date</b>", s["bcell"]),
                Paragraph("<b>Match</b>", s["bcell"]),
                Paragraph("<b>Summary &amp; Evidence</b>", s["bcell"]), Paragraph("<b>Source</b>", s["bcell"])]]
         for row in media:
-            sev = str(row.get("severity", "LOW")).upper()
-            sc = _risk_color(sev)
             conf = str(row.get("match_confidence", "STRONG")).upper()
             is_weak = conf == "WEAK"
             match_txt = ('<font color="#ea580c"><b>VERIFY</b></font>' if is_weak
@@ -155,14 +152,22 @@ def build_pdf(data: dict, out_path: Path) -> None:
             evidence = _xml(str(row.get("evidence", "")))
             if evidence:
                 summary += f'<br/><font size="6" color="#94a3b8">“{evidence}”</font>'
+            pub = row.get("pub_date_display", "")
+            if pub:
+                date_cell = f"<b>{_xml(pub)}</b>"
+            else:
+                date_cell = '<font color="#94a3b8"><i>Date unavailable</i></font>'
+            fetched = row.get("fetched_date_display", "")
+            if fetched:
+                date_cell += f'<br/><font size="6" color="#94a3b8">Fetched {_xml(fetched)}</font>'
             am.append([
                 Paragraph(_xml(str(row.get("entity", ""))), s["cell"]),
-                Paragraph(f'<font color="#{sc.hexval()[2:]}"><b>{sev}</b></font>', s["cell"]),
+                Paragraph(date_cell, s["cell"]),
                 Paragraph(match_txt, s["cell"]),
                 Paragraph(summary, s["cell"]),
                 Paragraph(_xml(str(row.get("source", ""))), s["small"]),
             ])
-        at = Table(am, colWidths=[30 * mm, 16 * mm, 18 * mm, None, 28 * mm])
+        at = Table(am, colWidths=[26 * mm, 22 * mm, 16 * mm, None, 24 * mm])
         at.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
             ("BACKGROUND", (0, 0), (-1, 0), LGRAY),
@@ -176,33 +181,6 @@ def build_pdf(data: dict, out_path: Path) -> None:
         story.append(Paragraph(
             "No adverse media articles matched in open-source news search as of "
             f"{_xml(date_str)}.", s["body"]))
-        story.append(Spacer(1, 5 * mm))
-
-    # Source Screening Checklist
-    checklist = data.get("checklist", [])
-    if checklist:
-        story.append(Paragraph("Source Screening Checklist", s["h2"]))
-        story.append(HRFlowable(width="100%", thickness=0.5, color=BLUE))
-        story.append(Spacer(1, 2 * mm))
-        cl = [[Paragraph("<b>Source</b>", s["bcell"]), Paragraph("<b>Result</b>", s["bcell"]),
-               Paragraph("<b>Finding</b>", s["bcell"])]]
-        for row in checklist:
-            res = str(row.get("result", "UNVERIFIED")).upper()
-            rc = _result_color(res)
-            cl.append([
-                Paragraph(_xml(str(row.get("list_name", ""))), s["cell"]),
-                Paragraph(f'<font color="#{rc.hexval()[2:]}"><b>{res}</b></font>', s["cell"]),
-                Paragraph(_xml(str(row.get("finding", ""))), s["cell"]),
-            ])
-        ct = Table(cl, colWidths=[48 * mm, 22 * mm, None])
-        ct.setStyle(TableStyle([
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
-            ("BACKGROUND", (0, 0), (-1, 0), LGRAY),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("LEFTPADDING", (0, 0), (-1, -1), 5),
-        ]))
-        story.append(ct)
         story.append(Spacer(1, 5 * mm))
 
     # Recommendations

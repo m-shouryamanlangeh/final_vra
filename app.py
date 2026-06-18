@@ -58,6 +58,7 @@ logger = logging.getLogger("erm.screen")
 from screening.screener import run_screen          # noqa: E402
 from screening.pdf_report import build_pdf          # noqa: E402
 from screening.checklist import SOURCE_COUNT        # noqa: E402
+from screening.dates import prepare_media, format_date  # noqa: E402
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -129,13 +130,21 @@ def result_page():
                 result = json.loads(json_path.read_text())
             except (ValueError, OSError) as exc:
                 logger.warning("Could not load result JSON %s: %s", json_path.name, exc)
+
+    # Normalise news dates for display: format publication / fetch dates in one
+    # format and order newest-first (missing dates at the bottom). Done at render
+    # time so older saved reports are presented consistently too.
+    raw_date = result.get("date_of_search", "")
+    result["adverse_media_findings"] = prepare_media(
+        result.get("adverse_media_findings", []), raw_date)
+
     return render_template(
         "result.html",
         active="screen",
         team=TEAM,
         vendor_name=vendor or result.get("vendor_name", ""),
         vendor_pan=pan or result.get("vendor_pan", ""),
-        date_of_search=result.get("date_of_search", ""),
+        date_of_search=format_date(raw_date) or raw_date,
         pdf_url=f"/output/{pdf}" if pdf else "",
         result=result,
     )

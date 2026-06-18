@@ -91,14 +91,22 @@
         {% endif %}
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead><tr><th class="ps-4">Entity</th><th>Severity</th><th>Match</th><th>Summary &amp; Evidence</th><th class="pe-4">Source</th></tr></thead>
+                <thead><tr><th class="ps-4">Entity</th><th>Date</th><th>Match</th><th>Summary &amp; Evidence</th><th class="pe-4">Source</th></tr></thead>
                 <tbody>
                 {% for m in result.adverse_media_findings %}
-                    {% set sev = (m.severity or 'LOW') | upper %}
                     {% set conf = (m.match_confidence or 'STRONG') | upper %}
                     <tr>
                         <td class="ps-4" style="color: var(--slate-500);">{{ m.entity }}</td>
-                        <td><span class="badge badge-{{ sev | lower }}">{{ sev }}</span></td>
+                        <td style="font-size: 12px; white-space: nowrap;">
+                            {% if m.pub_date_display %}
+                                <div style="color: var(--slate-600); font-weight: 600;" title="Publication date">{{ m.pub_date_display }}</div>
+                            {% else %}
+                                <div style="color: var(--slate-400); font-style: italic;" title="No publication date available">Date unavailable</div>
+                            {% endif %}
+                            {% if m.fetched_date_display %}
+                                <div style="color: var(--slate-400); font-size: 11px; margin-top: 2px;" title="Date fetched by the system">Fetched {{ m.fetched_date_display }}</div>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if conf == 'WEAK' %}<span class="badge badge-unverified" title="Name-only match — verify entity">VERIFY</span>
                             {% else %}<span class="badge badge-low" title="Full name match">CONFIRMED</span>{% endif %}
@@ -120,43 +128,6 @@
         {% endif %}
     </div>
 </div>
-
-<!-- Source screening checklist -->
-{% if result.checklist %}
-{% set badge_for = {'HIT': 'badge-high', 'CLEAR': 'badge-low', 'UNVERIFIED': 'badge-unverified'} %}
-<div class="section-card">
-    <div class="section-card-head">
-        <div class="icon-chip navy"><i class="fas fa-list-check"></i></div>
-        <div class="titles">
-            <h3>Source Screening Checklist</h3>
-            <div class="subtitle">{{ result.checklist | length }} sanctions / regulatory / court sources screened</div>
-        </div>
-    </div>
-    <div class="section-card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead><tr><th class="ps-4">Source</th><th>Result</th><th>Finding</th><th class="pe-4">Link</th></tr></thead>
-                <tbody>
-                {% for cat in result.checklist | map(attribute='category') | unique %}
-                    <tr><td colspan="4" class="ps-4" style="background: var(--slate-50); font-size: 11px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--slate-500);">{{ cat }}</td></tr>
-                    {% for c in result.checklist if c.category == cat %}
-                    {% set res = (c.result or 'UNVERIFIED') | upper %}
-                    <tr>
-                        <td class="ps-4" style="font-size: 12.5px; font-weight: 600; color: var(--slate-600);">{{ c.list_name }}</td>
-                        <td><span class="badge {{ badge_for.get(res, 'badge-unverified') }}">{{ res }}</span></td>
-                        <td style="font-size: 12px; color: var(--slate-500);">{{ c.finding }}</td>
-                        <td class="pe-4" style="font-size: 12px;">
-                            {% if c.source_url %}<a href="{{ c.source_url }}" target="_blank">Open <i class="fas fa-arrow-up-right-from-square"></i></a>{% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <p class="text-center" style="font-size: 11px; color: var(--slate-400); margin-top: 8px;">
     OSINT-based assessment only. Does not replace legal or credit bureau data. {{ team }} · CONFIDENTIAL — internal use only.
