@@ -19,17 +19,12 @@
 <div class="section-card">
     <div class="section-card-body">
         <div class="risk-hero">
-            <div class="risk-dial {{ risk }}">
-                <span class="rd-score">{{ es.risk_score or 0 }}</span>
-                <span class="rd-of">/ 100</span>
-            </div>
             <div class="flex-grow-1" style="min-width: 240px;">
                 <h2 style="font-size: 20px; font-weight: 700; margin: 0; color: var(--paytm-dark);">{{ vendor_name }}</h2>
                 <div style="font-size: 12.5px; color: var(--slate-500); margin-top: 2px;">
                     {% if vendor_pan %}PAN: {{ vendor_pan }} · {% endif %}Screened on {{ date_of_search }}
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
-                    <span class="badge badge-{{ risk | lower }}" style="font-size: 13px; padding: 6px 14px;">Risk: {{ risk }}</span>
                     <span class="badge badge-{{ (es.recommendation or '') | lower }}" style="font-size: 13px; padding: 6px 14px;">{{ es.recommendation }}</span>
                     <span class="badge badge-unverified" style="font-size: 13px; padding: 6px 14px;">{{ es.adverse_media_hits or 0 }} media hits</span>
                     {% if es.list_hits %}<span class="badge badge-high" style="font-size: 13px; padding: 6px 14px;">{{ es.list_hits }} watchlist hit(s)</span>{% endif %}
